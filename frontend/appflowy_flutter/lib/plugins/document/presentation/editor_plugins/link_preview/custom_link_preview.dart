@@ -1,3 +1,4 @@
+import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/mobile/presentation/widgets/widgets.dart';
@@ -10,7 +11,7 @@ import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher_string.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 class CustomLinkPreviewWidget extends StatelessWidget {
   const CustomLinkPreviewWidget({
@@ -37,7 +38,7 @@ class CustomLinkPreviewWidget extends StatelessWidget {
             .text
             .fontSize ??
         16.0;
-    final (fontSize, width) = PlatformExtension.isDesktopOrWeb
+    final (fontSize, width) = UniversalPlatform.isDesktopOrWeb
         ? (documentFontSize, 180.0)
         : (documentFontSize - 2, 120.0);
     final Widget child = Container(
@@ -111,9 +112,9 @@ class CustomLinkPreviewWidget extends StatelessWidget {
       ),
     );
 
-    if (PlatformExtension.isDesktopOrWeb) {
+    if (UniversalPlatform.isDesktopOrWeb) {
       return InkWell(
-        onTap: () => launchUrlString(url),
+        onTap: () => afLaunchUrlString(url),
         child: child,
       );
     }
@@ -122,7 +123,10 @@ class CustomLinkPreviewWidget extends StatelessWidget {
       node: node,
       editorState: context.read<EditorState>(),
       extendActionWidgets: _buildExtendActionWidgets(context),
-      child: child,
+      child: GestureDetector(
+        onTap: () => afLaunchUrlString(url),
+        child: child,
+      ),
     );
   }
 
@@ -133,8 +137,8 @@ class CustomLinkPreviewWidget extends StatelessWidget {
         showTopBorder: false,
         text: LocaleKeys.document_plugins_urlPreview_convertToLink.tr(),
         leftIcon: const FlowySvg(
-          FlowySvgs.m_aa_link_s,
-          size: Size.square(20),
+          FlowySvgs.m_toolbar_link_m,
+          size: Size.square(18),
         ),
         onTap: () {
           context.pop();

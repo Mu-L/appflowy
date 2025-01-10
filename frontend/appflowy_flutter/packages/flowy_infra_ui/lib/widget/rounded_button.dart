@@ -13,6 +13,8 @@ class RoundedTextButton extends StatelessWidget {
   final Color? hoverColor;
   final Color? textColor;
   final double? fontSize;
+  final FontWeight? fontWeight;
+  final EdgeInsets padding;
 
   const RoundedTextButton({
     super.key,
@@ -26,6 +28,8 @@ class RoundedTextButton extends StatelessWidget {
     this.hoverColor,
     this.textColor,
     this.fontSize,
+    this.fontWeight,
+    this.padding = const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
   });
 
   @override
@@ -40,6 +44,7 @@ class RoundedTextButton extends StatelessWidget {
       child: SizedBox.expand(
         child: FlowyTextButton(
           title ?? '',
+          fontWeight: fontWeight,
           onPressed: onPressed,
           fontSize: fontSize,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -48,6 +53,7 @@ class RoundedTextButton extends StatelessWidget {
           fillColor: fillColor ?? Theme.of(context).colorScheme.primary,
           hoverColor:
               hoverColor ?? Theme.of(context).colorScheme.primaryContainer,
+          padding: padding,
         ),
       ),
     );
@@ -80,7 +86,7 @@ class RoundedImageButton extends StatelessWidget {
       child: TextButton(
         onPressed: press,
         style: ButtonStyle(
-            shape: MaterialStateProperty.all<RoundedRectangleBorder>(
+            shape: WidgetStateProperty.all<RoundedRectangleBorder>(
                 RoundedRectangleBorder(borderRadius: borderRadius))),
         child: child,
       ),

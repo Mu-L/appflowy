@@ -15,6 +15,9 @@ pub struct UserWorkspaceTable {
   pub uid: i64,
   pub created_at: i64,
   pub database_storage_id: String,
+  pub icon: String,
+  pub member_count: i64,
+  pub role: Option<i32>,
 }
 
 pub fn get_user_workspace_op(workspace_id: &str, mut conn: DBConnection) -> Option<UserWorkspace> {
@@ -80,7 +83,7 @@ impl TryFrom<(i64, &UserWorkspace)> for UserWorkspaceTable {
     if value.1.id.is_empty() {
       return Err(FlowyError::invalid_data().with_context("The id is empty"));
     }
-    if value.1.workspace_database_object_id.is_empty() {
+    if value.1.workspace_database_id.is_empty() {
       return Err(FlowyError::invalid_data().with_context("The database storage id is empty"));
     }
 
@@ -89,7 +92,10 @@ impl TryFrom<(i64, &UserWorkspace)> for UserWorkspaceTable {
       name: value.1.name.clone(),
       uid: value.0,
       created_at: value.1.created_at.timestamp(),
-      database_storage_id: value.1.workspace_database_object_id.clone(),
+      database_storage_id: value.1.workspace_database_id.clone(),
+      icon: value.1.icon.clone(),
+      member_count: value.1.member_count,
+      role: value.1.role.clone().map(|v| v as i32),
     })
   }
 }
@@ -103,7 +109,10 @@ impl From<UserWorkspaceTable> for UserWorkspace {
         .timestamp_opt(value.created_at, 0)
         .single()
         .unwrap_or_default(),
-      workspace_database_object_id: value.database_storage_id,
+      workspace_database_id: value.database_storage_id,
+      icon: value.icon,
+      member_count: value.member_count,
+      role: value.role.map(|v| v.into()),
     }
   }
 }

@@ -1,10 +1,14 @@
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:appflowy/mobile/presentation/base/app_bar_actions.dart';
+import 'package:appflowy/mobile/presentation/base/app_bar/app_bar_actions.dart';
 import 'package:appflowy/mobile/presentation/widgets/widgets.dart';
+import 'package:appflowy/plugins/database/application/field/field_info.dart';
+import 'package:appflowy/plugins/database/application/field/sort_entities.dart';
 import 'package:appflowy/plugins/database/grid/application/sort/sort_editor_bloc.dart';
-import 'package:appflowy/plugins/database/grid/presentation/widgets/sort/sort_info.dart';
+import 'package:appflowy/plugins/database/grid/presentation/widgets/header/desktop_field_cell.dart';
+import 'package:appflowy/util/field_type_extension.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
+import 'package:collection/collection.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
@@ -139,7 +143,7 @@ class _Overview extends StatelessWidget {
         return Column(
           children: [
             Expanded(
-              child: state.sortInfos.isEmpty
+              child: state.sorts.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -167,10 +171,10 @@ class _Overview extends StatelessWidget {
                       onReorder: (oldIndex, newIndex) => context
                           .read<SortEditorBloc>()
                           .add(SortEditorEvent.reorderSort(oldIndex, newIndex)),
-                      itemCount: state.sortInfos.length,
+                      itemCount: state.sorts.length,
                       itemBuilder: (context, index) => _SortItem(
                         key: ValueKey("sort_item_$index"),
-                        sort: state.sortInfos[index],
+                        sort: state.sorts[index],
                       ),
                     ),
             ),
@@ -232,7 +236,7 @@ class _Overview extends StatelessWidget {
 class _SortItem extends StatelessWidget {
   const _SortItem({super.key, required this.sort});
 
-  final SortInfo sort;
+  final DatabaseSort sort;
 
   @override
   Widget build(BuildContext context) {
@@ -262,11 +266,9 @@ class _SortItem extends StatelessWidget {
                 children: [
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    child: Expanded(
-                      child: FlowyText.medium(
-                        LocaleKeys.grid_sort_by.tr(),
-                        fontSize: 15,
-                      ),
+                    child: FlowyText.medium(
+                      LocaleKeys.grid_sort_by.tr(),
+                      fontSize: 15,
                     ),
                   ),
                   const VSpace(10),
@@ -290,9 +292,18 @@ class _SortItem extends StatelessWidget {
                             child: Row(
                               children: [
                                 Expanded(
-                                  child: FlowyText(
-                                    sort.fieldInfo.name,
-                                    overflow: TextOverflow.ellipsis,
+                                  child: BlocSelector<SortEditorBloc,
+                                      SortEditorState, FieldInfo?>(
+                                    selector: (state) =>
+                                        state.allFields.firstWhereOrNull(
+                                      (field) => field.id == sort.fieldId,
+                                    ),
+                                    builder: (context, field) {
+                                      return FlowyText(
+                                        field?.name ?? "",
+                                        overflow: TextOverflow.ellipsis,
+                                      );
+                                    },
                                   ),
                                 ),
                                 const HSpace(6.0),
@@ -329,7 +340,7 @@ class _SortItem extends StatelessWidget {
                               children: [
                                 Expanded(
                                   child: FlowyText(
-                                    sort.sortPB.condition.name,
+                                    sort.condition.name,
                                   ),
                                 ),
                                 const HSpace(6.0),
@@ -351,11 +362,11 @@ class _SortItem extends StatelessWidget {
           ),
           Positioned(
             right: 8,
-            top: 9,
+            top: 6,
             child: InkWell(
               onTap: () => context
                   .read<SortEditorBloc>()
-                  .add(SortEditorEvent.deleteSort(sort)),
+                  .add(SortEditorEvent.deleteSort(sort.sortId)),
               // steal from the container LongClickReorderWidget thing
               onLongPress: () {},
               borderRadius: BorderRadius.circular(10),
@@ -387,14 +398,14 @@ class _SortDetail extends StatelessWidget {
 
     return isCreatingNewSort
         ? const _SortDetailContent()
-        : BlocSelector<SortEditorBloc, SortEditorState, SortInfo>(
-            selector: (state) => state.sortInfos.firstWhere(
-              (sortInfo) =>
-                  sortInfo.sortId ==
+        : BlocSelector<SortEditorBloc, SortEditorState, DatabaseSort>(
+            selector: (state) => state.sorts.firstWhere(
+              (sort) =>
+                  sort.sortId ==
                   context.read<MobileSortEditorCubit>().state.editingSortId,
             ),
-            builder: (context, sortInfo) {
-              return _SortDetailContent(sortInfo: sortInfo);
+            builder: (context, sort) {
+              return _SortDetailContent(sort: sort);
             },
           );
   }
@@ -402,10 +413,12 @@ class _SortDetail extends StatelessWidget {
 
 class _SortDetailContent extends StatelessWidget {
   const _SortDetailContent({
-    this.sortInfo,
+    this.sort,
   });
 
-  final SortInfo? sortInfo;
+  final DatabaseSort? sort;
+
+  bool get isCreatingNewSort => sort == null;
 
   @override
   Widget build(BuildContext context) {
@@ -417,9 +430,9 @@ class _SortDetailContent extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: DefaultTabController(
             length: 2,
-            initialIndex: sortInfo == null
+            initialIndex: isCreatingNewSort
                 ? 0
-                : sortInfo!.sortPB.condition == SortConditionPB.Ascending
+                : sort!.condition == SortConditionPB.Ascending
                     ? 0
                     : 1,
             child: Container(
@@ -438,7 +451,7 @@ class _SortDetailContent extends StatelessWidget {
                   color: Theme.of(context).colorScheme.surface,
                 ),
                 splashFactory: NoSplash.splashFactory,
-                overlayColor: const MaterialStatePropertyAll(
+                overlayColor: const WidgetStatePropertyAll(
                   Colors.transparent,
                 ),
                 onTap: (index) {
@@ -489,30 +502,45 @@ class _SortDetailContent extends StatelessWidget {
           child: BlocBuilder<SortEditorBloc, SortEditorState>(
             builder: (context, state) {
               final fields = state.allFields
-                  .where(
-                    (field) =>
-                        field.canCreateSort ||
-                        sortInfo != null && sortInfo!.fieldId == field.id,
-                  )
+                  .where((field) => field.fieldType.canCreateSort)
                   .toList();
               return ListView.builder(
                 itemCount: fields.length,
                 itemBuilder: (context, index) {
                   final fieldInfo = fields[index];
-                  final isSelected = sortInfo == null
+                  final isSelected = isCreatingNewSort
                       ? context
                               .watch<MobileSortEditorCubit>()
                               .state
                               .newSortFieldId ==
                           fieldInfo.id
-                      : sortInfo!.fieldId == fieldInfo.id;
+                      : sort!.fieldId == fieldInfo.id;
+
+                  final canSort =
+                      fieldInfo.fieldType.canCreateSort && !fieldInfo.hasSort;
+                  final beingEdited =
+                      !isCreatingNewSort && sort!.fieldId == fieldInfo.id;
+                  final enabled = canSort || beingEdited;
+
                   return FlowyOptionTile.checkbox(
                     text: fieldInfo.field.name,
+                    leftIcon: FieldIcon(
+                      fieldInfo: fieldInfo,
+                    ),
                     isSelected: isSelected,
+                    textColor: enabled ? null : Theme.of(context).disabledColor,
                     showTopBorder: false,
                     onTap: () {
-                      if (!isSelected) {
+                      if (isSelected) {
+                        return;
+                      }
+                      if (enabled) {
                         _changeFieldId(context, fieldInfo.id);
+                      } else {
+                        Fluttertoast.showToast(
+                          msg: LocaleKeys.grid_sort_fieldInUse.tr(),
+                          gravity: ToastGravity.BOTTOM,
+                        );
                       }
                     },
                   );
@@ -526,12 +554,12 @@ class _SortDetailContent extends StatelessWidget {
   }
 
   void _changeCondition(BuildContext context, SortConditionPB newCondition) {
-    if (sortInfo == null) {
+    if (isCreatingNewSort) {
       context.read<MobileSortEditorCubit>().changeSortCondition(newCondition);
     } else {
       context.read<SortEditorBloc>().add(
             SortEditorEvent.editSort(
-              sortId: sortInfo!.sortId,
+              sortId: sort!.sortId,
               condition: newCondition,
             ),
           );
@@ -539,12 +567,12 @@ class _SortDetailContent extends StatelessWidget {
   }
 
   void _changeFieldId(BuildContext context, String newFieldId) {
-    if (sortInfo == null) {
+    if (isCreatingNewSort) {
       context.read<MobileSortEditorCubit>().changeFieldId(newFieldId);
     } else {
       context.read<SortEditorBloc>().add(
             SortEditorEvent.editSort(
-              sortId: sortInfo!.sortId,
+              sortId: sort!.sortId,
               fieldId: newFieldId,
             ),
           );

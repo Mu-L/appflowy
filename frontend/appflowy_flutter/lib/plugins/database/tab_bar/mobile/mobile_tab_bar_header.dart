@@ -1,36 +1,33 @@
+import 'package:appflowy/plugins/database/grid/presentation/layout/sizes.dart';
+import 'package:flutter/material.dart';
+
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/mobile/presentation/bottom_sheet/show_transition_bottom_sheet.dart';
 import 'package:appflowy/mobile/presentation/database/view/database_view_list.dart';
 import 'package:appflowy/plugins/base/emoji/emoji_text.dart';
 import 'package:appflowy/plugins/database/application/tab_bar_bloc.dart';
-import 'package:appflowy/plugins/database/grid/presentation/layout/sizes.dart';
 import 'package:appflowy/plugins/database/widgets/setting/mobile_database_controls.dart';
 import 'package:appflowy/workspace/application/view/view_bloc.dart';
 import 'package:appflowy/workspace/application/view/view_ext.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:collection/collection.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../grid/presentation/grid_page.dart';
-
-class MobileTabBarHeader extends StatefulWidget {
+class MobileTabBarHeader extends StatelessWidget {
   const MobileTabBarHeader({super.key});
 
   @override
-  State<MobileTabBarHeader> createState() => _MobileTabBarHeaderState();
-}
-
-class _MobileTabBarHeaderState extends State<MobileTabBarHeader> {
-  @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: EdgeInsets.only(
+        left: GridSize.horizontalHeaderPadding,
+        top: 14.0,
+        right: GridSize.horizontalHeaderPadding - 5.0,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          HSpace(GridSize.leadingHeaderPadding),
           const _DatabaseViewSelectorButton(),
           const Spacer(),
           BlocBuilder<DatabaseTabBarBloc, DatabaseTabBarState>(
@@ -46,7 +43,16 @@ class _MobileTabBarHeaderState extends State<MobileTabBarHeader> {
               return MobileDatabaseControls(
                 controller: state
                     .tabBarControllerByViewId[currentView.viewId]!.controller,
-                toggleExtension: ToggleExtensionNotifier(),
+                features: switch (currentView.layout) {
+                  ViewLayoutPB.Board || ViewLayoutPB.Calendar => [
+                      MobileDatabaseControlFeatures.filter,
+                    ],
+                  ViewLayoutPB.Grid => [
+                      MobileDatabaseControlFeatures.sort,
+                      MobileDatabaseControlFeatures.filter,
+                    ],
+                  _ => [],
+                },
               );
             },
           ),
@@ -73,18 +79,22 @@ class _DatabaseViewSelectorButton extends StatelessWidget {
 
         return TextButton(
           style: ButtonStyle(
-            padding: const MaterialStatePropertyAll(
+            padding: const WidgetStatePropertyAll(
               EdgeInsets.fromLTRB(12, 8, 8, 8),
             ),
-            maximumSize: const MaterialStatePropertyAll(Size(200, 48)),
-            minimumSize: const MaterialStatePropertyAll(Size(48, 0)),
-            shape: const MaterialStatePropertyAll(
+            maximumSize: const WidgetStatePropertyAll(Size(200, 48)),
+            minimumSize: const WidgetStatePropertyAll(Size(48, 0)),
+            shape: const WidgetStatePropertyAll(
               RoundedRectangleBorder(
                 borderRadius: BorderRadius.all(Radius.circular(12)),
               ),
             ),
-            backgroundColor: const MaterialStatePropertyAll(Color(0x0F212729)),
-            overlayColor: MaterialStatePropertyAll(
+            backgroundColor: WidgetStatePropertyAll(
+              Theme.of(context).brightness == Brightness.light
+                  ? const Color(0x0F212729)
+                  : const Color(0x0FFFFFFF),
+            ),
+            overlayColor: WidgetStatePropertyAll(
               Theme.of(context).colorScheme.secondary,
             ),
           ),
@@ -95,8 +105,8 @@ class _DatabaseViewSelectorButton extends StatelessWidget {
               const HSpace(6),
               Flexible(
                 child: FlowyText.medium(
-                  tabBar.view.name,
-                  fontSize: 13,
+                  tabBar.view.nameOrDefault,
+                  fontSize: 14,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -111,7 +121,6 @@ class _DatabaseViewSelectorButton extends StatelessWidget {
             showTransitionMobileBottomSheet(
               context,
               showDivider: false,
-              initialStop: 1.0,
               builder: (_) {
                 return MultiBlocProvider(
                   providers: [

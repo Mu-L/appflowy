@@ -1,23 +1,28 @@
+import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/env/cloud_env.dart';
 import 'package:appflowy/env/env.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
+import 'package:appflowy/plugins/shared/share/constants.dart';
 import 'package:appflowy/workspace/application/settings/appflowy_cloud_setting_bloc.dart';
 import 'package:appflowy/workspace/application/settings/appflowy_cloud_urls_bloc.dart';
 import 'package:appflowy/workspace/presentation/settings/widgets/_restart_app_button.dart';
 import 'package:appflowy/workspace/presentation/widgets/dialogs.dart';
+import 'package:appflowy/workspace/presentation/widgets/toggle/toggle.dart';
 import 'package:appflowy_backend/dispatch/dispatch.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-user/protobuf.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/user_setting.pb.dart';
 import 'package:appflowy_result/appflowy_result.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/size.dart';
+import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flowy_infra_ui/widget/error_page.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class AppFlowyCloudViewSetting extends StatelessWidget {
   const AppFlowyCloudViewSetting({
@@ -42,11 +47,11 @@ class AppFlowyCloudViewSetting extends StatelessWidget {
             (setting) => _renderContent(context, setting),
             (err) => FlowyErrorPage.message(err.toString(), howToFix: ""),
           );
-        } else {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
         }
+
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
       },
     );
   }
@@ -62,13 +67,19 @@ class AppFlowyCloudViewSetting extends StatelessWidget {
         builder: (context, state) {
           return Column(
             children: [
+              const VSpace(8),
               const AppFlowyCloudEnableSync(),
+              const VSpace(6),
+              const AppFlowyCloudSyncLogEnabled(),
               const VSpace(12),
               RestartButton(
                 onClick: () {
                   NavigatorAlertDialog(
                     title: LocaleKeys.settings_menu_restartAppTip.tr(),
                     confirm: () async {
+                      await useBaseWebDomain(
+                        ShareConstants.defaultBaseWebDomain,
+                      );
                       await useAppFlowyBetaCloudWithURL(
                         serverURL,
                         authenticatorType,
@@ -118,6 +129,7 @@ class CustomAppFlowyCloudView extends StatelessWidget {
     final List<Widget> children = [];
     children.addAll([
       const AppFlowyCloudEnableSync(),
+      const AppFlowyCloudSyncLogEnabled(),
       const VSpace(40),
     ]);
 
@@ -167,7 +179,7 @@ class AppFlowyCloudURLs extends StatelessWidget {
           builder: (context, state) {
             return Column(
               children: [
-                const AppFlowySelfhostTip(),
+                const AppFlowySelfHostTip(),
                 CloudURLInput(
                   title: LocaleKeys.settings_menu_cloudURL.tr(),
                   url: state.config.base_url,
@@ -175,6 +187,19 @@ class AppFlowyCloudURLs extends StatelessWidget {
                   onChanged: (text) {
                     context.read<AppFlowyCloudURLsBloc>().add(
                           AppFlowyCloudURLsEvent.updateServerUrl(
+                            text,
+                          ),
+                        );
+                  },
+                ),
+                const VSpace(8),
+                CloudURLInput(
+                  title: LocaleKeys.settings_menu_webURL.tr(),
+                  url: state.config.base_web_domain,
+                  hint: LocaleKeys.settings_menu_webURLHint.tr(),
+                  onChanged: (text) {
+                    context.read<AppFlowyCloudURLsBloc>().add(
+                          AppFlowyCloudURLsEvent.updateBaseWebDomain(
                             text,
                           ),
                         );
@@ -203,8 +228,8 @@ class AppFlowyCloudURLs extends StatelessWidget {
   }
 }
 
-class AppFlowySelfhostTip extends StatelessWidget {
-  const AppFlowySelfhostTip({super.key});
+class AppFlowySelfHostTip extends StatelessWidget {
+  const AppFlowySelfHostTip({super.key});
 
   final url =
       "https://docs.appflowy.io/docs/guides/appflowy/self-hosting-appflowy#build-appflowy-with-a-self-hosted-server";
@@ -227,7 +252,8 @@ class AppFlowySelfhostTip extends StatelessWidget {
                     color: Theme.of(context).colorScheme.primary,
                     decoration: TextDecoration.underline,
                   ),
-              recognizer: TapGestureRecognizer()..onTap = () => _launchURL(),
+              recognizer: TapGestureRecognizer()
+                ..onTap = () => afLaunchUrlString(url),
             ),
             TextSpan(
               text: LocaleKeys.settings_menu_selfHostEnd.tr(),
@@ -237,15 +263,6 @@ class AppFlowySelfhostTip extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _launchURL() async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      Log.error("Could not launch $url");
-    }
   }
 }
 
@@ -297,7 +314,7 @@ class CloudURLInputState extends State<CloudURLInput> {
             .copyWith(fontWeight: FontWeight.w400, fontSize: 16),
         enabledBorder: UnderlineInputBorder(
           borderSide:
-              BorderSide(color: Theme.of(context).colorScheme.onBackground),
+              BorderSide(color: AFThemeExtension.of(context).onBackground),
         ),
         focusedBorder: UnderlineInputBorder(
           borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
@@ -321,18 +338,104 @@ class AppFlowyCloudEnableSync extends StatelessWidget {
           children: [
             FlowyText.medium(LocaleKeys.settings_menu_enableSync.tr()),
             const Spacer(),
-            Switch.adaptive(
-              onChanged: (bool value) {
-                context.read<AppFlowyCloudSettingBloc>().add(
-                      AppFlowyCloudSettingEvent.enableSync(value),
-                    );
-              },
-              activeColor: Theme.of(context).colorScheme.primary,
+            Toggle(
               value: state.setting.enableSync,
+              onChanged: (value) => context
+                  .read<AppFlowyCloudSettingBloc>()
+                  .add(AppFlowyCloudSettingEvent.enableSync(value)),
             ),
           ],
         );
       },
     );
   }
+}
+
+class AppFlowyCloudSyncLogEnabled extends StatelessWidget {
+  const AppFlowyCloudSyncLogEnabled({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<AppFlowyCloudSettingBloc, AppFlowyCloudSettingState>(
+      builder: (context, state) {
+        return Row(
+          children: [
+            FlowyText.medium(LocaleKeys.settings_menu_enableSyncLog.tr()),
+            const Spacer(),
+            Toggle(
+              value: state.isSyncLogEnabled,
+              onChanged: (value) {
+                if (value) {
+                  showCancelAndConfirmDialog(
+                    context: context,
+                    title: LocaleKeys.settings_menu_enableSyncLog.tr(),
+                    description:
+                        LocaleKeys.settings_menu_enableSyncLogWarning.tr(),
+                    confirmLabel: LocaleKeys.button_confirm.tr(),
+                    onConfirm: () {
+                      context
+                          .read<AppFlowyCloudSettingBloc>()
+                          .add(AppFlowyCloudSettingEvent.enableSyncLog(value));
+                    },
+                  );
+                } else {
+                  context
+                      .read<AppFlowyCloudSettingBloc>()
+                      .add(AppFlowyCloudSettingEvent.enableSyncLog(value));
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class BillingGateGuard extends StatelessWidget {
+  const BillingGateGuard({required this.builder, super.key});
+
+  final Widget Function(BuildContext context) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: isBillingEnabled(),
+      builder: (context, snapshot) {
+        final isBillingEnabled = snapshot.data ?? false;
+        if (isBillingEnabled &&
+            snapshot.connectionState == ConnectionState.done) {
+          return builder(context);
+        }
+
+        // If the billing is not enabled, show nothing
+        return const SizedBox.shrink();
+      },
+    );
+  }
+}
+
+Future<bool> isBillingEnabled() async {
+  final result = await UserEventGetCloudConfig().send();
+  return result.fold(
+    (cloudSetting) {
+      final whiteList = [
+        "https://beta.appflowy.cloud",
+        "https://test.appflowy.cloud",
+      ];
+      if (kDebugMode) {
+        whiteList.add("http://localhost:8000");
+      }
+
+      final isWhiteListed = whiteList.contains(cloudSetting.serverUrl);
+      if (!isWhiteListed) {
+        Log.warn("Billing is not enabled for server ${cloudSetting.serverUrl}");
+      }
+      return isWhiteListed;
+    },
+    (err) {
+      Log.error("Failed to get cloud config: $err");
+      return false;
+    },
+  );
 }
