@@ -2,6 +2,7 @@
 
 import 'dart:ffi';
 import 'dart:io';
+
 // ignore: import_of_legacy_library_into_null_safe
 import 'package:ffi/ffi.dart' as ffi;
 import 'package:flutter/foundation.dart' as Foundation;
@@ -110,6 +111,22 @@ typedef _set_stream_port_Dart = int Function(
   int port,
 );
 
+/// C function `set log stream port`.
+int set_log_stream_port(int port) {
+  return _set_log_stream_port(port);
+}
+
+final _set_log_stream_port_Dart _set_log_stream_port = _dart_ffi_lib
+    .lookupFunction<_set_log_stream_port_C, _set_log_stream_port_Dart>(
+        'set_log_stream_port');
+
+typedef _set_log_stream_port_C = Int32 Function(
+  Int64 port,
+);
+typedef _set_log_stream_port_Dart = int Function(
+  int port,
+);
+
 /// C function `link_me_please`.
 void link_me_please() {
   _link_me_please();
@@ -137,20 +154,20 @@ typedef _store_dart_post_cobject_Dart = void Function(
   Pointer<NativeFunction<Int8 Function(Int64, Pointer<Dart_CObject>)>> ptr,
 );
 
-void log(
+void rust_log(
   int level,
   Pointer<ffi.Utf8> data,
 ) {
-  _invoke_log(level, data);
+  _invoke_rust_log(level, data);
 }
 
-final _invoke_log_Dart _invoke_log = _dart_ffi_lib
-    .lookupFunction<_invoke_log_C, _invoke_log_Dart>('backend_log');
-typedef _invoke_log_C = Void Function(
+final _invoke_rust_log_Dart _invoke_rust_log = _dart_ffi_lib
+    .lookupFunction<_invoke_rust_log_C, _invoke_rust_log_Dart>('rust_log');
+typedef _invoke_rust_log_C = Void Function(
   Int64 level,
   Pointer<ffi.Utf8> data,
 );
-typedef _invoke_log_Dart = void Function(
+typedef _invoke_rust_log_Dart = void Function(
   int level,
   Pointer<ffi.Utf8>,
 );

@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:appflowy_backend/protobuf/flowy-notification/protobuf.dart';
 import 'package:appflowy_result/appflowy_result.dart';
 
-class NotificationParser<T, E> {
+class NotificationParser<T, E extends Object> {
   NotificationParser({
     this.id,
     required this.callback,
@@ -14,7 +14,7 @@ class NotificationParser<T, E> {
   String? id;
   void Function(T, FlowyResult<Uint8List, E>) callback;
   E Function(Uint8List) errorParser;
-  T? Function(int) tyParser;
+  T? Function(int, String) tyParser;
 
   void parse(SubscribeObject subject) {
     if (id != null) {
@@ -23,7 +23,7 @@ class NotificationParser<T, E> {
       }
     }
 
-    final ty = tyParser(subject.ty);
+    final ty = tyParser(subject.ty, subject.source);
     if (ty == null) {
       return;
     }
